@@ -42,10 +42,16 @@ class Card(ABC):
 
 class SpellCard(Card):
     wait_time = BASIC_SPELL_WAIT_TIME
+    spell_damage = 0
 
     @classmethod
     def get_card_type(cls):
         return CARD_SPELL
+
+    @classmethod
+    def get_spell_damage(cls, state):
+        _spell_damage = cls.spell_damage + state.my_total_spell_power
+        return _spell_damage
 
 
 class SpellNoPoint(SpellCard):
