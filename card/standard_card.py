@@ -403,7 +403,7 @@ class VoidShard(SpellPointOppo):
         if state.oppo_hero.health <= spell_damage:
             return 1000, -1
 
-        for oppo_index, oppo_minion in enumerate(state.targetable_oppo_minions):
+        for oppo_index, oppo_minion in enumerate(state.touchable_oppo_minions):
             temp_delta_h = oppo_minion.delta_h_after_damage(spell_damage) + cls.bias
             if temp_delta_h > best_delta_h:
                 best_delta_h = temp_delta_h
