@@ -6,12 +6,13 @@ import copy
 
 class StrategyEntity:
     def __init__(self, card_id, zone, zone_pos,
-                 current_cost, overload):
+                 current_cost, overload, is_mine):
         self.card_id = card_id
         self.zone = zone
         self.zone_pos = zone_pos
         self.current_cost = current_cost
         self.overload = overload
+        self.is_mine = is_mine
 
     @property
     def name(self):
@@ -37,6 +38,16 @@ class StrategyEntity:
         else:
             return ID2CARD_DICT.get(self.card_id, None)
 
+    # uni_index是对场上可能要被鼠标指到的对象的统一编号.
+    # 包括敌我随从和敌我英雄, 具体编号为:
+    # 0-6: 我方随从
+    # 9: 我方英雄
+    # 10-16: 敌方随从
+    # 19: 敌方英雄　
+    @property
+    def uni_index(self):
+        return -1
+
 
 CRITICAL_MINION = {
     "VAN_NEW1_019": 1.5,  # 飞刀杂耍者
@@ -51,7 +62,7 @@ CRITICAL_MINION = {
 
 class StrategyMinion(StrategyEntity):
     def __init__(self, card_id, zone, zone_pos,
-                 current_cost, overload,
+                 current_cost, overload, is_mine,
                  attack, max_health, damage=0,
                  taunt=0, divine_shield=0, stealth=0,
                  windfury=0, poisonous=0, life_steal=0,
@@ -60,8 +71,9 @@ class StrategyMinion(StrategyEntity):
                  charge=0, rush=0,
                  attackable_by_rush=0, frozen=0,
                  dormant=0, untouchable=0, immune=0,
-                 cant_attack=0, exhausted=1, just_played=0):
-        super().__init__(card_id, zone, zone_pos, current_cost, overload)
+                 cant_attack=0, exhausted=1, num_turns_in_play=1):
+        super().__init__(card_id, zone, zone_pos,
+                         current_cost, overload, is_mine)
         self.attack = attack
         self.max_health = max_health
         self.damage = damage
@@ -78,6 +90,7 @@ class StrategyMinion(StrategyEntity):
         self.not_targeted_by_power = not_targeted_by_power
         self.charge = charge
         self.rush = rush
+        # 当一个随从具有毛刺绿边（就是突袭随从刚出来时的绿边）的时候就会有这个属性
         self.attackable_by_rush = attackable_by_rush
         self.frozen = frozen
         self.dormant = dormant
@@ -85,14 +98,18 @@ class StrategyMinion(StrategyEntity):
         # self.untouchable = untouchable
         self.immune = immune
         self.cant_attack = cant_attack
-        self.just_played = just_played
-
+        self.num_turns_in_play = num_turns_in_play
+        # exhausted == 1: 随从没有绿边, 不能动
+        # 普通随从一入场便具有 exhausted == 1,
+        # 但是突袭随从和冲锋随从一开始不具有这个标签,
+        # 所以还要另作判断(尤其是突袭随从一开始不能打脸)
         self.exhausted = exhausted
-        if self.exhausted == -1:
-            if self.charge or self.rush:
-                self.exhausted = 0
-            else:
-                self.exhausted = 1
+
+        # 对于突袭随从, 第一回合应不能打脸, 而能攻击随从由
+        # attackable_by_rush体现
+        if self.rush and not self.charge \
+                and self.num_turns_in_play < 2:
+            self.exhausted = 1
 
     def __str__(self):
         temp = f"[{self.zone_pos}] {self.name} " \
@@ -145,6 +162,13 @@ class StrategyMinion(StrategyEntity):
         return CARD_MINION
 
     @property
+    def uni_index(self):
+        if self.is_mine:
+            return self.zone_pos - 1
+        else:
+            return self.zone_pos - 1 + 10
+
+    @property
     def health(self):
         return self.max_health - self.damage
 
@@ -154,18 +178,16 @@ class StrategyMinion(StrategyEntity):
                and not self.dormant \
                and not self.frozen \
                and not self.cant_attack \
-               and self.exhausted == 0 \
-               and (not self.just_played or self.charge)
+               and self.exhausted == 0
 
     @property
     def can_attack_minion(self):
-        #  原本的逻辑好像有些奇怪，根据打脸的逻辑改了
-        return not self.frozen \
+        return self.attack > 0 \
                and not self.dormant \
-               and self.attack > 0 \
+               and not self.frozen\
                and not self.cant_attack \
-               and self.exhausted == 0 \
-               and (not self.just_played or self.rush)
+               and (self.exhausted == 0
+                    or self.attackable_by_rush)
 
     @property
     def can_be_pointed_by_spell(self):
@@ -246,7 +268,14 @@ class StrategyMinion(StrategyEntity):
     def delta_h_after_damage(self, damage):
         temp_minion = copy.copy(self)
         temp_minion.get_damaged(damage)
-        return self.heuristic_val - temp_minion.heuristic_val
+        delta = self.heuristic_val - temp_minion.heuristic_val
+
+        if self.is_mine:
+            delta *= MY_DELTA_H_FACTOR
+        else:
+            delta *= OPPO_DELTA_H_FACTOR
+
+        return delta
 
     def delta_h_after_heal(self, heal):
         temp_minion = copy.copy(self)
@@ -256,9 +285,10 @@ class StrategyMinion(StrategyEntity):
 
 class StrategyWeapon(StrategyEntity):
     def __init__(self, card_id, zone, zone_pos,
-                 current_cost, overload,
+                 current_cost, overload, is_mine,
                  attack, durability, damage=0, windfury=0):
-        super().__init__(card_id, zone, zone_pos, current_cost, overload)
+        super().__init__(card_id, zone, zone_pos,
+                         current_cost, overload, is_mine)
         self.attack = attack
         self.durability = durability
         self.damage = damage
@@ -286,13 +316,13 @@ class StrategyWeapon(StrategyEntity):
 
 class StrategyHero(StrategyEntity):
     def __init__(self, card_id, zone, zone_pos,
-                 current_cost, overload,
+                 current_cost, overload, is_mine,
                  max_health, damage=0,
                  stealth=0, immune=0,
                  not_targeted_by_spell=0, not_targeted_by_power=0,
                  armor=0, attack=0, exhausted=1):
-        super().__init__(card_id, zone, zone_pos, current_cost, overload)
-
+        super().__init__(card_id, zone, zone_pos,
+                         current_cost, overload, is_mine)
         self.max_health = max_health
         self.damage = damage
         self.stealth = stealth
@@ -323,6 +353,13 @@ class StrategyHero(StrategyEntity):
     @property
     def cardtype(self):
         return CARD_HERO
+
+    @property
+    def uni_index(self):
+        if self.is_mine:
+            return 9
+        else:
+            return 19
 
     @property
     def health(self):
@@ -399,10 +436,10 @@ class StrategySpell(StrategyEntity):
 
 class StrategyHeroPower(StrategyEntity):
     def __init__(self, card_id, zone, zone_pos,
-                 current_cost, overload,
+                 current_cost, overload, is_mine,
                  exhausted):
         super().__init__(card_id, zone, zone_pos,
-                         current_cost, overload)
+                         current_cost, overload, is_mine)
         self.exhausted = exhausted
 
     @property
