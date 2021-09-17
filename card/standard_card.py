@@ -138,10 +138,12 @@ class OverconfidentOrc(MinionNoPoint):
 # 神圣新星
 class HolyNova(SpellNoPoint):
     bias = -8
+    spell_damage = 2
 
     @classmethod
     def best_h_and_arg(cls, state, hand_card_index):
-        return cls.bias + sum([minion.delta_h_after_damage(2)
+        spell_dammage = cls.get_spell_damage(state)
+        return cls.bias + sum([minion.delta_h_after_damage(spell_dammage)
                                for minion in state.oppo_minions]),
 
 
@@ -162,6 +164,7 @@ class Hysteria(SpellPointOppo):
 
         for chosen_index, chosen_minion in enumerate(state.oppo_minions):
             if not chosen_minion.can_be_pointed_by_spell:
+                print('cannot be pointed by spell')
                 continue
 
             delta_h_count = 0
@@ -175,9 +178,10 @@ class Hysteria(SpellPointOppo):
                     another_index_list.pop(tmp_chosen_index)
                     if len(another_index_list) == 0:
                         break
+
                     another_index = another_index_list[random.randint(0, len(another_index_list) - 1)]
 
-                    # print("another index: ", another_index)
+                    print("another index: ", another_index)
                     if another_index >= tmp_state.oppo_minion_num:
                         another_minion = tmp_state.my_minions[another_index - tmp_state.oppo_minion_num]
                         if another_minion.get_damaged(chosen_minion.attack):
@@ -190,16 +194,16 @@ class Hysteria(SpellPointOppo):
                                 tmp_chosen_index -= 1
 
                     if chosen_minion.get_damaged(another_minion.attack):
-                        # print("h:", tmp_state.heuristic_value, state.heuristic_value)
+                        print("h:", tmp_state.heuristic_value, state.heuristic_value)
                         tmp_state.oppo_minions.pop(tmp_chosen_index)
                         break
 
-                    # print("h:", tmp_state.heuristic_value, state.heuristic_value)
+                    print("h:", tmp_state.heuristic_value, state.heuristic_value)
 
                 delta_h_count += tmp_state.heuristic_value - state.heuristic_value
 
             delta_h_count /= sample_times
-            # print("average delta_h:", delta_h_count)
+            print("average delta_h:", delta_h_count)
             if delta_h_count > best_delta_h:
                 best_delta_h = delta_h_count
                 best_arg = chosen_index
@@ -403,7 +407,10 @@ class VoidShard(SpellPointOppo):
         if state.oppo_hero.health <= spell_damage:
             return 1000, -1
 
-        for oppo_index, oppo_minion in enumerate(state.touchable_oppo_minions):
+        for oppo_index, oppo_minion in enumerate(state.oppo_minions):
+            if not oppo_minion.can_be_pointed_by_spell:
+                print('VoidShard: minion cannot pointed by spell')
+                continue
             temp_delta_h = oppo_minion.delta_h_after_damage(spell_damage) + cls.bias
             if temp_delta_h > best_delta_h:
                 best_delta_h = temp_delta_h
@@ -467,7 +474,7 @@ class CTunTheShattered(MinionNoPoint):
 class EyeOfCTun(SpellNoPoint):
     wait_time = 2
     spell_damage = 7
-    bias = -6  # 把吸的血直接算进bias
+    bias = -6
 
     @classmethod
     def best_h_and_arg(cls, state, hand_card_index):
