@@ -70,4 +70,6 @@ ID2CARD_DICT = {
     "VAN_NEW1_041": StampedingKodo,
     "VAN_EX1_590": BloodKnight,
     "VAN_EX1_247": StormforgedAxe,
+    "VAN_EX1_116": LeeroyJenkins,
+    "VAN_EX1_567": DoomHammer,
 }

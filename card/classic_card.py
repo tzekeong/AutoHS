@@ -163,7 +163,6 @@ class EarthenRingFarseer(MinionPointMine):
 
 # 憎恶
 class Abomination(MinionNoPoint):
-    keep_in_hand_bool = True
 
     @classmethod
     def utilize_delta_h_and_arg(cls, state, hand_card_index):
@@ -246,7 +245,6 @@ class DoomSayer(MinionNoPoint):
 
 
 class StormforgedAxe(WeaponCard):
-    keep_in_hand_bool = True
     value = 1.5
 
     @classmethod
@@ -262,3 +260,24 @@ class StormforgedAxe(WeaponCard):
                     return 2000,
 
         return cls.value,
+
+
+class LeeroyJenkins(MinionNoPoint):
+    keep_in_hand_bool = True
+
+    @classmethod
+    def utilize_delta_h_and_arg(cls, state, hand_card_index):
+        has_taunt = state.oppo_has_taunt
+        beat_face_win = state.my_total_attack + 6 >= state.oppo_hero.health
+        if not has_taunt and state.oppo_hero.can_be_pointed_by_minion:
+            if beat_face_win:
+                return 1000,
+
+            return 1,
+
+        return -1,
+
+
+class DoomHammer(WeaponCard):
+    keep_in_hand_bool = False
+    value = 3

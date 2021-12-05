@@ -343,6 +343,10 @@ class StrategyState:
                     max_my_index = -1
                     max_oppo_index = oppo_index
 
+            #  如果没有打手下就打脸
+            if max_my_index == -2 and not has_taunt and self.oppo_hero.can_be_pointed_by_minion:
+                return -1, -1
+
         debug_print(f"最终决策: max_my_index: {max_my_index}, "
                     f"max_oppo_index: {max_oppo_index}")
 
